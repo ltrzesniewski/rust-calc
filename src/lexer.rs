@@ -37,18 +37,16 @@ impl<'a> Lexer<'a> {
 
     fn next_token(&mut self) -> Option<Result<Token, Error>> {
         loop {
-            return if let Some(c) = self.next_char() {
-                if c.is_whitespace() {
-                    continue;
-                } else if let Some(token) = self.read_symbol() {
-                    Some(Ok(token))
-                } else if let Some(token) = self.read_number() {
-                    Some(Ok(token))
-                } else {
-                    Some(Err(Error::InvalidCharacter(c)))
-                }
+            let c = self.next_char()?;
+
+            return if c.is_whitespace() {
+                continue;
+            } else if let Some(token) = self.read_symbol() {
+                Some(Ok(token))
+            } else if let Some(token) = self.read_number() {
+                Some(Ok(token))
             } else {
-                None
+                Some(Err(Error::InvalidCharacter(c)))
             };
         }
     }
@@ -74,7 +72,7 @@ impl<'a> Lexer<'a> {
         let mut has_period = false;
 
         loop {
-            match self.peek_u8() {
+            match self.peek_u8().unwrap_or_default() {
                 b'0'..=b'9' => {
                     self.next_char();
                 }
@@ -98,21 +96,12 @@ impl<'a> Lexer<'a> {
     }
 
     fn next_char(&mut self) -> Option<char> {
-        if let Some((idx, c)) = self.iter.next() {
-            self.offset = idx;
-            self.current = c;
-            Some(c)
-        } else {
-            None
-        }
+        (self.offset, self.current) = self.iter.next()?;
+        Some(self.current)
     }
 
-    fn peek_u8(&self) -> u8 {
-        if let Some(&b) = self.iter.as_str().as_bytes().first() {
-            b
-        } else {
-            0
-        }
+    fn peek_u8(&self) -> Option<u8> {
+        Some(*self.iter.as_str().as_bytes().first()?)
     }
 }
 
