@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::str::CharIndices;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -112,6 +113,16 @@ impl Iterator for Lexer<'_> {
         self.next_token()
     }
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::InvalidCharacter(char) => write!(f, "Invalid character: {}", char),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {

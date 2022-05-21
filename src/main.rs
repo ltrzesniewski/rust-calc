@@ -2,6 +2,7 @@ mod calculator;
 mod lexer;
 mod parser;
 
+use std::error::Error;
 use atty::Stream;
 use std::io;
 use std::io::Write;
@@ -31,33 +32,26 @@ fn main() -> io::Result<()> {
         }
 
         match eval(input) {
-            Ok(result) => println!("{result}"),
-            Err(error) => eprintln!("{error}"),
+            Ok(result) => println!("= {}", result),
+            Err(error) => eprintln!("{}", error),
         }
     }
 
     Ok(())
 }
 
-fn eval(input: &str) -> Result<f64, String> {
+fn eval(input: &str) -> Result<f64, Box<dyn Error>> {
     let mut tokens = Vec::new();
 
     for item in lexer::lex(input) {
         match item {
             Ok(token) => tokens.push(token),
-            Err(lexer::Error::InvalidCharacter(char)) => {
-                return Err(format!("Invalid character: {}", char));
-            }
+            Err(error) => return Err(Box::new(error)),
         }
     }
 
     match parser::parse(tokens.into_iter()) {
         Ok(ast) => Ok(calculator::evaluate(ast.deref())),
-        Err(parser::Error::EmptyStream) => Err(String::from("Empty input")),
-        Err(parser::Error::UnexpectedToken(token)) => Err(format!("Unexpected token: {:?}", token)),
-        Err(parser::Error::UnexpectedEndOfStream) => Err(String::from("Unterminated expression")),
-        Err(parser::Error::UnexpectedTrailingToken(token)) => {
-            Err(format!("Extraneous input: {:?}", token))
-        }
+        Err(error) => Err(Box::new(error)),
     }
 }

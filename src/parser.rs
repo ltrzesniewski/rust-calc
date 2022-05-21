@@ -1,4 +1,5 @@
 use crate::lexer::{Token, Token::*};
+use std::fmt::{Display, Formatter};
 use Node::*;
 
 #[derive(PartialEq, Debug)]
@@ -134,6 +135,19 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         };
     }
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::EmptyStream => write!(f, "Empty input"),
+            Error::UnexpectedToken(token) => write!(f, "Unexpected token: {:?}", token),
+            Error::UnexpectedEndOfStream => write!(f, "Unterminated expression"),
+            Error::UnexpectedTrailingToken(token) => write!(f, "Extraneous input: {:?}", token),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 #[cfg(test)]
 #[rustfmt::skip]
