@@ -16,7 +16,7 @@ pub enum Error {
     InvalidCharacter(char),
 }
 
-pub struct Lexer<'a> {
+struct Lexer<'a> {
     input: &'a str,
     iter: CharIndices<'a>,
     current: char,
@@ -25,16 +25,16 @@ pub struct Lexer<'a> {
     offset: usize,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn lex(input: &'a str) -> Lexer<'a> {
-        Lexer {
-            input,
-            iter: input.char_indices(),
-            current: char::from(0),
-            offset: 0,
-        }
+pub fn lex(input: &str) -> impl Iterator<Item = Result<Token, Error>> + '_ {
+    Lexer {
+        input,
+        iter: input.char_indices(),
+        current: char::from(0),
+        offset: 0,
     }
+}
 
+impl Lexer<'_> {
     fn next_token(&mut self) -> Option<Result<Token, Error>> {
         loop {
             let c = self.next_char()?;
@@ -105,7 +105,7 @@ impl<'a> Lexer<'a> {
     }
 }
 
-impl<'a> Iterator for Lexer<'a> {
+impl Iterator for Lexer<'_> {
     type Item = Result<Token, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn valid() {
-        let tokens = Lexer::lex("(-1 + 2.5) * 3/4 ").collect::<Vec<_>>();
+        let tokens = lex("(-1 + 2.5) * 3/4 ").collect::<Vec<_>>();
 
         assert_eq!(
             tokens,
@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn invalid() {
-        let tokens = Lexer::lex("1.2.3µ").collect::<Vec<_>>();
+        let tokens = lex("1.2.3µ").collect::<Vec<_>>();
 
         assert_eq!(
             tokens,

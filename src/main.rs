@@ -1,9 +1,7 @@
+mod calculator;
 mod lexer;
 mod parser;
-mod calculator;
 
-use lexer::Lexer;
-use parser::Parser;
 use atty::Stream;
 use std::io;
 use std::io::Write;
@@ -44,7 +42,7 @@ fn main() -> io::Result<()> {
 fn eval(input: &str) -> Result<f64, String> {
     let mut tokens = Vec::new();
 
-    for item in Lexer::lex(input) {
+    for item in lexer::lex(input) {
         match item {
             Ok(token) => tokens.push(token),
             Err(lexer::Error::InvalidCharacter(char)) => {
@@ -53,7 +51,7 @@ fn eval(input: &str) -> Result<f64, String> {
         }
     }
 
-    match Parser::parse(tokens.into_iter()) {
+    match parser::parse(tokens.into_iter()) {
         Ok(ast) => Ok(calculator::evaluate(ast.deref())),
         Err(parser::Error::EmptyStream) => Err(String::from("Empty input")),
         Err(parser::Error::UnexpectedToken(token)) => Err(format!("Unexpected token: {:?}", token)),

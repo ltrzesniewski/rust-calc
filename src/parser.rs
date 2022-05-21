@@ -19,7 +19,7 @@ pub enum Error {
     UnexpectedTrailingToken(Token),
 }
 
-pub struct Parser<T: Iterator<Item = Token>> {
+struct Parser<T: Iterator<Item = Token>> {
     // This is an LL(1) parser
     iter: T,
     current: Option<Token>,
@@ -28,24 +28,23 @@ pub struct Parser<T: Iterator<Item = Token>> {
 
 type ParseResult = Result<Box<Node>, Error>;
 
-impl<T: Iterator<Item = Token>> Parser<T> {
-    // TODO : Try to make the following signature work: parse(tokens: impl IntoIterator<Item=Token>)
-    pub fn parse(tokens: T) -> ParseResult {
-        let mut parser = Parser::new(tokens.into_iter().fuse());
+pub fn parse(tokens: impl IntoIterator<Item = Token>) -> ParseResult {
+    let mut parser = Parser::new(tokens.into_iter().fuse());
 
-        if parser.current == None {
-            return Err(Error::EmptyStream);
-        }
-
-        let expr = parser.parse_expression()?;
-
-        if let Some(token) = parser.current {
-            return Err(Error::UnexpectedTrailingToken(token));
-        }
-
-        Ok(expr)
+    if parser.current == None {
+        return Err(Error::EmptyStream);
     }
 
+    let expr = parser.parse_expression()?;
+
+    if let Some(token) = parser.current {
+        return Err(Error::UnexpectedTrailingToken(token));
+    }
+
+    Ok(expr)
+}
+
+impl<T: Iterator<Item = Token>> Parser<T> {
     fn new(tokens: T) -> Parser<T> {
         let mut iter = tokens;
         let (current, next) = (iter.next(), iter.next());
@@ -144,7 +143,7 @@ mod tests {
     #[test]
     fn valid() {
         //  -1 + 2*3 - 4/5 + 6
-        let result = Parser::parse([
+        let result = parse([
             Minus,
             Number(1.0),
             Plus,
@@ -186,28 +185,28 @@ mod tests {
 
     #[test]
     fn empty() {
-        let result = Parser::parse([].into_iter());
+        let result = parse([].into_iter());
 
         assert_eq!(result, Err(Error::EmptyStream))
     }
 
     #[test]
     fn trailing() {
-        let result = Parser::parse([Number(1.0), Number(2.0)].into_iter());
+        let result = parse([Number(1.0), Number(2.0)].into_iter());
 
         assert_eq!(result, Err(Error::UnexpectedTrailingToken(Number(2.0))))
     }
 
     #[test]
     fn unexpected_eof() {
-        let result = Parser::parse([Minus].into_iter());
+        let result = parse([Minus].into_iter());
 
         assert_eq!(result, Err(Error::UnexpectedEndOfStream))
     }
 
     #[test]
     fn unexpected_eof_2() {
-        let result = Parser::parse([Number(1.0), Minus].into_iter());
+        let result = parse([Number(1.0), Minus].into_iter());
 
         assert_eq!(result, Err(Error::UnexpectedEndOfStream))
     }
