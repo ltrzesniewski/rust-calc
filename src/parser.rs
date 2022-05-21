@@ -150,11 +150,11 @@ impl Display for Error {
 impl std::error::Error for Error {}
 
 #[cfg(test)]
-#[rustfmt::skip]
 mod tests {
     use super::*;
 
     #[test]
+    #[rustfmt::skip]
     fn valid() {
         //  -1 + 2*3 - 4/5 + 6
         let result = parse([

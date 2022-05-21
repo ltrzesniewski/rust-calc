@@ -2,8 +2,8 @@ mod calculator;
 mod lexer;
 mod parser;
 
-use std::error::Error;
 use atty::Stream;
+use std::error::Error;
 use std::io;
 use std::io::Write;
 use std::ops::Deref;

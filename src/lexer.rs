@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::str::CharIndices;
+use Token::*;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Token {
@@ -54,12 +55,12 @@ impl Lexer<'_> {
 
     fn read_symbol(&self) -> Option<Token> {
         match self.current {
-            '+' => Some(Token::Plus),
-            '-' => Some(Token::Minus),
-            '*' => Some(Token::Star),
-            '/' => Some(Token::Slash),
-            '(' => Some(Token::OpenParen),
-            ')' => Some(Token::CloseParen),
+            '+' => Some(Plus),
+            '-' => Some(Minus),
+            '*' => Some(Star),
+            '/' => Some(Slash),
+            '(' => Some(OpenParen),
+            ')' => Some(CloseParen),
             _ => None,
         }
     }
@@ -89,7 +90,7 @@ impl Lexer<'_> {
             }
         }
 
-        Some(Token::Number(
+        Some(Number(
             self.input[start_offset..=self.offset]
                 .parse::<f64>()
                 .unwrap(),
@@ -126,7 +127,6 @@ impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
-    use super::Token::*;
     use super::*;
 
     #[test]
