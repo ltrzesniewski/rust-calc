@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::iter::Peekable;
 use std::str::CharIndices;
 use Token::*;
 
@@ -20,7 +21,7 @@ pub enum Error {
 
 struct Lexer<'a> {
     input: &'a str,
-    iter: CharIndices<'a>,
+    iter: Peekable<CharIndices<'a>>,
     current: char,
 
     // CharIndices::offset is unstable :'(
@@ -30,7 +31,7 @@ struct Lexer<'a> {
 pub fn lex(input: &str) -> impl Iterator<Item = Result<Token, Error>> + '_ {
     Lexer {
         input,
-        iter: input.char_indices(),
+        iter: input.char_indices().peekable(),
         current: char::from(0),
         offset: 0,
     }
@@ -74,11 +75,11 @@ impl Lexer<'_> {
         let mut has_period = false;
 
         loop {
-            match self.peek_u8().unwrap_or_default() {
-                b'0'..=b'9' => {
+            match self.peek().unwrap_or_default() {
+                '0'..='9' => {
                     self.next_char();
                 }
-                b'.' => {
+                '.' => {
                     if has_period {
                         break;
                     }
@@ -102,8 +103,8 @@ impl Lexer<'_> {
         Some(self.current)
     }
 
-    fn peek_u8(&self) -> Option<u8> {
-        Some(*self.iter.as_str().as_bytes().first()?)
+    fn peek(&mut self) -> Option<char> {
+        Some(self.iter.peek()?.1)
     }
 }
 
