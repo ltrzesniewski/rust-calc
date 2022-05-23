@@ -4,8 +4,9 @@ use std::str::CharIndices;
 use Token::*;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub enum Token {
+pub enum Token<'a> {
     Number(f64),
+    Identifier(&'a str),
     Plus,
     Minus,
     Star,
@@ -14,7 +15,7 @@ pub enum Token {
     CloseParen,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Error {
     InvalidCharacter(char),
 }
@@ -28,7 +29,7 @@ struct Lexer<'a> {
     offset: usize,
 }
 
-pub fn lex(input: &str) -> impl Iterator<Item = Result<Token, Error>> + '_ {
+pub fn lex(input: &str) -> impl Iterator<Item = Result<Token, Error>> {
     Lexer {
         input,
         iter: input.char_indices().peekable(),
@@ -37,8 +38,8 @@ pub fn lex(input: &str) -> impl Iterator<Item = Result<Token, Error>> + '_ {
     }
 }
 
-impl Lexer<'_> {
-    fn next_token(&mut self) -> Option<Result<Token, Error>> {
+impl<'a> Lexer<'a> {
+    fn next_token(&mut self) -> Option<Result<Token<'a>, Error>> {
         loop {
             let c = self.next_char()?;
 
@@ -48,13 +49,15 @@ impl Lexer<'_> {
                 Some(Ok(token))
             } else if let Some(token) = self.read_number() {
                 Some(Ok(token))
+            } else if let Some(token) = self.read_identifier() {
+                Some(Ok(token))
             } else {
                 Some(Err(Error::InvalidCharacter(c)))
             };
         }
     }
 
-    fn read_symbol(&self) -> Option<Token> {
+    fn read_symbol(&self) -> Option<Token<'a>> {
         match self.current {
             '+' => Some(Plus),
             '-' => Some(Minus),
@@ -66,7 +69,7 @@ impl Lexer<'_> {
         }
     }
 
-    fn read_number(&mut self) -> Option<Token> {
+    fn read_number(&mut self) -> Option<Token<'a>> {
         if !self.current.is_ascii_digit() {
             return None;
         }
@@ -98,6 +101,20 @@ impl Lexer<'_> {
         ))
     }
 
+    fn read_identifier(&mut self) -> Option<Token<'a>> {
+        if !self.current.is_ascii_alphabetic() {
+            return None;
+        }
+
+        let start_offset = self.offset;
+
+        while self.peek().unwrap_or_default().is_ascii_alphabetic() {
+            self.next_char();
+        }
+
+        Some(Identifier(&self.input[start_offset..=self.offset]))
+    }
+
     fn next_char(&mut self) -> Option<char> {
         (self.offset, self.current) = self.iter.next()?;
         Some(self.current)
@@ -108,8 +125,8 @@ impl Lexer<'_> {
     }
 }
 
-impl Iterator for Lexer<'_> {
-    type Item = Result<Token, Error>;
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Result<Token<'a>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_token()
@@ -148,6 +165,16 @@ mod tests {
                 Ok(Slash),
                 Ok(Number(4.0)),
             ]
+        );
+    }
+
+    #[test]
+    fn identifiers() {
+        let tokens = lex("foo + bar").collect::<Vec<_>>();
+
+        assert_eq!(
+            tokens,
+            [Ok(Identifier("foo")), Ok(Plus), Ok(Identifier("bar")),]
         );
     }
 

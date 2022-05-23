@@ -3,33 +3,35 @@ use std::fmt::{Display, Formatter};
 use Node::*;
 
 #[derive(PartialEq, Debug)]
-pub enum Node {
+pub enum Node<'a> {
     Value(f64),
-    Negation(Box<Node>),
-    Addition(Box<Node>, Box<Node>),
-    Subtraction(Box<Node>, Box<Node>),
-    Multiplication(Box<Node>, Box<Node>),
-    Division(Box<Node>, Box<Node>),
+    Constant(&'a str),
+    Negation(Box<Node<'a>>),
+    Addition(Box<Node<'a>>, Box<Node<'a>>),
+    Subtraction(Box<Node<'a>>, Box<Node<'a>>),
+    Multiplication(Box<Node<'a>>, Box<Node<'a>>),
+    Division(Box<Node<'a>>, Box<Node<'a>>),
+    Function(&'a str, Box<Node<'a>>),
 }
 
 #[derive(PartialEq, Debug)]
-pub enum Error {
+pub enum Error<'a> {
     EmptyStream,
-    UnexpectedToken(Token),
+    UnexpectedToken(Token<'a>),
     UnexpectedEndOfStream,
-    UnexpectedTrailingToken(Token),
+    UnexpectedTrailingToken(Token<'a>),
 }
 
-struct Parser<T: Iterator<Item = Token>> {
+struct Parser<'a, T: Iterator<Item = Token<'a>>> {
     // This is an LL(1) parser
     iter: T,
-    current: Option<Token>,
-    next: Option<Token>,
+    current: Option<Token<'a>>,
+    next: Option<Token<'a>>,
 }
 
-type ParseResult = Result<Box<Node>, Error>;
+type ParseResult<'a> = Result<Box<Node<'a>>, Error<'a>>;
 
-pub fn parse(tokens: impl IntoIterator<Item = Token>) -> ParseResult {
+pub fn parse<'a>(tokens: impl IntoIterator<Item = Token<'a>>) -> ParseResult<'a> {
     let mut parser = Parser::new(tokens.into_iter().fuse());
 
     if parser.current == None {
@@ -45,8 +47,8 @@ pub fn parse(tokens: impl IntoIterator<Item = Token>) -> ParseResult {
     Ok(expr)
 }
 
-impl<T: Iterator<Item = Token>> Parser<T> {
-    fn new(tokens: T) -> Parser<T> {
+impl<'a, T: Iterator<Item = Token<'a>>> Parser<'a, T> {
+    fn new(tokens: T) -> Parser<'a, T> {
         let mut iter = tokens;
         let (current, next) = (iter.next(), iter.next());
 
@@ -61,7 +63,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         (self.current, self.next) = (self.next, self.iter.next());
     }
 
-    fn consume_token(&mut self, token: Token) -> Result<(), Error> {
+    fn consume_token(&mut self, token: Token) -> Result<(), Error<'a>> {
         return match self.current {
             Some(current) if current == token => {
                 self.next_token();
@@ -72,11 +74,11 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         };
     }
 
-    fn parse_expression(&mut self) -> ParseResult {
+    fn parse_expression(&mut self) -> ParseResult<'a> {
         self.parse_terms()
     }
 
-    fn parse_terms(&mut self) -> ParseResult {
+    fn parse_terms(&mut self) -> ParseResult<'a> {
         let mut left = self.parse_factors()?;
 
         loop {
@@ -93,7 +95,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         }
     }
 
-    fn parse_factors(&mut self) -> ParseResult {
+    fn parse_factors(&mut self) -> ParseResult<'a> {
         let mut left = self.parse_unary()?;
 
         loop {
@@ -110,7 +112,7 @@ impl<T: Iterator<Item = Token>> Parser<T> {
         }
     }
 
-    fn parse_unary(&mut self) -> ParseResult {
+    fn parse_unary(&mut self) -> ParseResult<'a> {
         return match self.current {
             Some(Number(value)) => {
                 self.next_token();
@@ -130,13 +132,24 @@ impl<T: Iterator<Item = Token>> Parser<T> {
                 self.next_token();
                 Ok(Box::new(Negation(self.parse_unary()?)))
             }
+            Some(Identifier(name)) => {
+                self.next_token();
+                if self.current == Some(OpenParen) {
+                    self.next_token();
+                    let expr = self.parse_expression()?;
+                    self.consume_token(CloseParen)?;
+                    Ok(Box::new(Function(name, expr)))
+                } else {
+                    Ok(Box::new(Constant(name)))
+                }
+            }
             Some(other) => Err(Error::UnexpectedToken(other)),
             None => Err(Error::UnexpectedEndOfStream),
         };
     }
 }
 
-impl Display for Error {
+impl Display for Error<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::EmptyStream => write!(f, "Empty input"),
@@ -147,7 +160,7 @@ impl Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error<'_> {}
 
 #[cfg(test)]
 mod tests {
