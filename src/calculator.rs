@@ -1,5 +1,5 @@
-use crate::parser::{Node, Node::*};
-use crate::{lexer, parser};
+use crate::binder::{Node, Node::*};
+use crate::{binder, lexer, parser};
 use std::cell::Cell;
 use std::error::Error;
 use std::ops::Deref;
@@ -17,25 +17,23 @@ pub fn eval_str<'a>(input: &'a str) -> Result<f64, Box<dyn Error + 'a>> {
 
     let result = parser::parse(tokens);
 
+    // Lexer errors should be returned first
     if let Some(error) = lexer_error.get() {
         return Err(Box::new(error));
     }
 
-    match result {
-        Ok(ast) => Ok(eval_node(ast.deref())),
-        Err(error) => Err(Box::new(error)),
-    }
+    let result = binder::bind(*result?)?;
+    Ok(eval_node(result.deref()))
 }
 
 fn eval_node(node: &Node) -> f64 {
     return match node {
         Value(value) => *value,
-        Negation(value) => -eval_node(value),
+        Negation(node) => -eval_node(node),
         Addition(left, right) => eval_node(left) + eval_node(right),
         Subtraction(left, right) => eval_node(left) - eval_node(right),
         Multiplication(left, right) => eval_node(left) * eval_node(right),
         Division(left, right) => eval_node(left) / eval_node(right),
-        Constant(_) => 0.0,    // TODO
-        Function(_, _) => 0.0, // TODO
+        Function(func, node) => func(eval_node(node)),
     };
 }
