@@ -35,5 +35,6 @@ fn eval_node(node: &Node) -> f64 {
         Multiplication(left, right) => eval_node(left) * eval_node(right),
         Division(left, right) => eval_node(left) / eval_node(right),
         Function(func, node) => func(eval_node(node)),
+        Function2(func, first, second) => func(eval_node(first), eval_node(second)),
     };
 }

@@ -13,6 +13,7 @@ pub enum Node {
     Multiplication(Box<Node>, Box<Node>),
     Division(Box<Node>, Box<Node>),
     Function(fn(f64) -> f64, Box<Node>),
+    Function2(fn(f64, f64) -> f64, Box<Node>, Box<Node>),
 }
 
 #[derive(PartialEq, Debug)]
@@ -36,6 +37,11 @@ pub fn bind(node: ParserNode) -> Result<Box<Node>, Error> {
             Ok(Box::new(Multiplication(bind(*left)?, bind(*right)?)))
         }
         ParserNode::Division(left, right) => Ok(Box::new(Division(bind(*left)?, bind(*right)?))),
+        ParserNode::Exponentiation(base, exponent) => Ok(Box::new(Function2(
+            f64::powf,
+            bind(*base)?,
+            bind(*exponent)?,
+        ))),
         ParserNode::Function(name, node) => {
             Ok(Box::new(Function(bind_function(name)?, bind(*node)?)))
         }

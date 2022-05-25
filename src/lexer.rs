@@ -13,6 +13,7 @@ pub enum Token<'a> {
     Slash,
     OpenParen,
     CloseParen,
+    Caret,
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -65,6 +66,7 @@ impl<'a> Lexer<'a> {
             '/' => Some(Slash),
             '(' => Some(OpenParen),
             ')' => Some(CloseParen),
+            '^' => Some(Caret),
             _ => None,
         }
     }
@@ -149,7 +151,7 @@ mod tests {
 
     #[test]
     fn valid() {
-        let tokens = lex("(-1 + 2.5) * 3/4 ").collect::<Vec<_>>();
+        let tokens = lex("(-1 + 2.5) * 3/4^5 ").collect::<Vec<_>>();
 
         assert_eq!(
             tokens,
@@ -164,6 +166,8 @@ mod tests {
                 Ok(Number(3.0)),
                 Ok(Slash),
                 Ok(Number(4.0)),
+                Ok(Caret),
+                Ok(Number(5.0)),
             ]
         );
     }

@@ -1,7 +1,7 @@
-mod lexer;
-mod parser;
 mod binder;
 mod calculator;
+mod lexer;
+mod parser;
 
 use atty::Stream;
 use std::io;

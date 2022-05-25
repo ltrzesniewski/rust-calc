@@ -11,6 +11,7 @@ pub enum Node<'a> {
     Subtraction(Box<Node<'a>>, Box<Node<'a>>),
     Multiplication(Box<Node<'a>>, Box<Node<'a>>),
     Division(Box<Node<'a>>, Box<Node<'a>>),
+    Exponentiation(Box<Node<'a>>, Box<Node<'a>>),
     Function(&'a str, Box<Node<'a>>),
 }
 
@@ -96,7 +97,7 @@ impl<'a, T: Iterator<Item = Token<'a>>> Parser<'a, T> {
     }
 
     fn parse_factors(&mut self) -> ParseResult<'a> {
-        let mut left = self.parse_unary()?;
+        let mut left = self.parse_exponents()?;
 
         loop {
             let op = match self.current {
@@ -106,9 +107,24 @@ impl<'a, T: Iterator<Item = Token<'a>>> Parser<'a, T> {
             };
 
             self.next_token();
-            let right = self.parse_unary()?;
+            let right = self.parse_exponents()?;
 
             left = Box::new(op(left, right))
+        }
+    }
+
+    fn parse_exponents(&mut self) -> ParseResult<'a> {
+        let mut left = self.parse_unary()?;
+
+        loop {
+            if self.current != Some(Caret) {
+                return Ok(left);
+            }
+
+            self.next_token();
+            let right = self.parse_unary()?;
+
+            left = Box::new(Exponentiation(left, right))
         }
     }
 
@@ -169,7 +185,7 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn valid() {
-        //  -1 + 2*3 - 4/5 + 6
+        //  -1 + 2*3 - 4/5^6 + 7
         let result = parse([
             Minus,
             Number(1.0),
@@ -181,8 +197,10 @@ mod tests {
             Number(4.0),
             Slash,
             Number(5.0),
-            Plus,
+            Caret,
             Number(6.0),
+            Plus,
+            Number(7.0),
         ].into_iter());
 
         assert_eq!(
@@ -201,10 +219,13 @@ mod tests {
                         )),
                         new(Division(
                             new(Value(4.0)),
-                            new(Value(5.0)),
+                            new(Exponentiation(
+                                new(Value(5.0)),
+                                new(Value(6.0)),
+                            )),
                         )),
                     )),
-                    new(Value(6.0)),
+                    new(Value(7.0)),
                 ))
             )
         )
@@ -213,28 +234,24 @@ mod tests {
     #[test]
     fn empty() {
         let result = parse([].into_iter());
-
         assert_eq!(result, Err(Error::EmptyStream))
     }
 
     #[test]
     fn trailing() {
         let result = parse([Number(1.0), Number(2.0)].into_iter());
-
         assert_eq!(result, Err(Error::UnexpectedTrailingToken(Number(2.0))))
     }
 
     #[test]
     fn unexpected_eof() {
         let result = parse([Minus].into_iter());
-
         assert_eq!(result, Err(Error::UnexpectedEndOfStream))
     }
 
     #[test]
     fn unexpected_eof_2() {
         let result = parse([Number(1.0), Minus].into_iter());
-
         assert_eq!(result, Err(Error::UnexpectedEndOfStream))
     }
 
