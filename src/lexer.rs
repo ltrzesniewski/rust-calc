@@ -110,7 +110,7 @@ impl<'a> Lexer<'a> {
 
         let start_offset = self.offset;
 
-        while self.peek().unwrap_or_default().is_ascii_alphabetic() {
+        while self.peek().unwrap_or_default().is_ascii_alphanumeric() {
             self.next_char();
         }
 
@@ -174,11 +174,11 @@ mod tests {
 
     #[test]
     fn identifiers() {
-        let tokens = lex("foo + bar").collect::<Vec<_>>();
+        let tokens = lex("foo + bar2").collect::<Vec<_>>();
 
         assert_eq!(
             tokens,
-            [Ok(Identifier("foo")), Ok(Plus), Ok(Identifier("bar")),]
+            [Ok(Identifier("foo")), Ok(Plus), Ok(Identifier("bar2")),]
         );
     }
 

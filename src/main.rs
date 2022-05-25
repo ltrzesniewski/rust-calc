@@ -1,7 +1,7 @@
 use atty::Stream;
+use rust_calc::*;
 use std::io;
 use std::io::Write;
-use rust_calc::*;
 
 fn main() -> io::Result<()> {
     let stdin = io::stdin();
