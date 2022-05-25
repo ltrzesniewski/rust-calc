@@ -1,11 +1,7 @@
-mod binder;
-mod calculator;
-mod lexer;
-mod parser;
-
 use atty::Stream;
 use std::io;
 use std::io::Write;
+use rust_calc::*;
 
 fn main() -> io::Result<()> {
     let stdin = io::stdin();
@@ -30,7 +26,7 @@ fn main() -> io::Result<()> {
             break;
         }
 
-        match calculator::eval_str(input) {
+        match eval_str(input) {
             Ok(result) => println!("= {}", result),
             Err(error) => eprintln!("{}", error),
         }
