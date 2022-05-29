@@ -4,7 +4,12 @@ use std::cell::Cell;
 use std::error::Error;
 use std::ops::Deref;
 
-pub fn eval_str<'a>(input: &'a str) -> Result<f64, Box<dyn Error + 'a>> {
+pub struct EvalResult<'a> {
+    pub value: f64,
+    pub ast: Box<parser::Node<'a>>,
+}
+
+pub fn eval_str<'a>(input: &'a str) -> Result<EvalResult<'a>, Box<dyn Error + 'a>> {
     let lexer_error = Cell::new(None);
 
     let tokens = lexer::lex(input).map_while(|item| match item {
@@ -15,15 +20,18 @@ pub fn eval_str<'a>(input: &'a str) -> Result<f64, Box<dyn Error + 'a>> {
         }
     });
 
-    let result = parser::parse(tokens);
+    let ast = parser::parse(tokens);
 
     // Lexer errors should be returned first
     if let Some(error) = lexer_error.get() {
         return Err(Box::new(error));
     }
 
-    let result = binder::bind(*result?)?;
-    Ok(eval_node(result.deref()))
+    let ast = ast?;
+    let bound = binder::bind(ast.deref())?;
+    let value = eval_node(bound.deref());
+
+    Ok(EvalResult { value, ast })
 }
 
 fn eval_node(node: &Node) -> f64 {

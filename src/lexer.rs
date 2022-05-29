@@ -135,6 +135,22 @@ impl<'a> Iterator for Lexer<'a> {
     }
 }
 
+impl Display for Token<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Number(value) => write!(f, "{}", value),
+            Identifier(name) => write!(f, "{}", name),
+            Plus => write!(f, "+"),
+            Minus => write!(f, "-"),
+            Star => write!(f, "*"),
+            Slash => write!(f, "/"),
+            OpenParen => write!(f, "("),
+            CloseParen => write!(f, ")"),
+            Caret => write!(f, "^"),
+        }
+    }
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {

@@ -165,6 +165,22 @@ impl<'a, T: Iterator<Item = Token<'a>>> Parser<'a, T> {
     }
 }
 
+impl Display for Node<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value(value) => write!(f, "{}", value),
+            Constant(name) => write!(f, "{}", name),
+            Negation(node) => write!(f, "-{}", node),
+            Addition(left, right) => write!(f, "({} + {})", left, right),
+            Subtraction(left, right) => write!(f, "({} - {})", left, right),
+            Multiplication(left, right) => write!(f, "({} * {})", left, right),
+            Division(left, right) => write!(f, "({} / {})", left, right),
+            Exponentiation(base, exponent) => write!(f, "({}^{})", base, exponent),
+            Function(name, arg) => write!(f, "{}({})", name, arg),
+        }
+    }
+}
+
 impl Display for Error<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {

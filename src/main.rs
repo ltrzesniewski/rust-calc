@@ -27,7 +27,10 @@ fn main() -> io::Result<()> {
         }
 
         match eval_str(input) {
-            Ok(result) => println!("= {}", result),
+            Ok(result) => {
+                println!("= {}", result.ast);
+                println!("= {}", result.value);
+            }
             Err(error) => eprintln!("{}", error),
         }
     }

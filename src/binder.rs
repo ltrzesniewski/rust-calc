@@ -24,26 +24,24 @@ pub enum Error<'a> {
 
 type ParserNode<'a> = parser::Node<'a>;
 
-pub fn bind(node: ParserNode) -> Result<Box<Node>, Error> {
+pub fn bind<'a>(node: &ParserNode<'a>) -> Result<Box<Node>, Error<'a>> {
     match node {
-        ParserNode::Value(value) => Ok(Box::new(Value(value))),
+        ParserNode::Value(value) => Ok(Box::new(Value(*value))),
         ParserNode::Constant(name) => Ok(Box::new(Value(bind_constant(name)?))),
-        ParserNode::Negation(node) => Ok(Box::new(Negation(bind(*node)?))),
-        ParserNode::Addition(left, right) => Ok(Box::new(Addition(bind(*left)?, bind(*right)?))),
+        ParserNode::Negation(node) => Ok(Box::new(Negation(bind(node)?))),
+        ParserNode::Addition(left, right) => Ok(Box::new(Addition(bind(left)?, bind(right)?))),
         ParserNode::Subtraction(left, right) => {
-            Ok(Box::new(Subtraction(bind(*left)?, bind(*right)?)))
+            Ok(Box::new(Subtraction(bind(left)?, bind(right)?)))
         }
         ParserNode::Multiplication(left, right) => {
-            Ok(Box::new(Multiplication(bind(*left)?, bind(*right)?)))
+            Ok(Box::new(Multiplication(bind(left)?, bind(right)?)))
         }
-        ParserNode::Division(left, right) => Ok(Box::new(Division(bind(*left)?, bind(*right)?))),
-        ParserNode::Exponentiation(base, exponent) => Ok(Box::new(Function2(
-            f64::powf,
-            bind(*base)?,
-            bind(*exponent)?,
-        ))),
+        ParserNode::Division(left, right) => Ok(Box::new(Division(bind(left)?, bind(right)?))),
+        ParserNode::Exponentiation(base, exponent) => {
+            Ok(Box::new(Function2(f64::powf, bind(base)?, bind(exponent)?)))
+        }
         ParserNode::Function(name, node) => {
-            Ok(Box::new(Function(bind_function(name)?, bind(*node)?)))
+            Ok(Box::new(Function(bind_function(name)?, bind(node)?)))
         }
     }
 }
