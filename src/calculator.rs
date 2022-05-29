@@ -51,6 +51,29 @@ fn eval<'a>(node: &Node<'a>) -> Result<Node<'a>, Error<'a>> {
         }),
         Addition(left, right) => Ok(match (eval(left)?, eval(right)?) {
             (Value(left), Value(right)) => Value(left + right),
+            // Keep constants on the right side
+            (Addition(left, right), Value(value)) | (Value(value), Addition(left, right)) => {
+                match (*left, *right) {
+                    (Value(value2), other) | (other, Value(value2)) => {
+                        Addition(Box::new(other), Box::new(Value(value + value2)))
+                    }
+                    (left, right) => Addition(
+                        Box::new(Addition(Box::new(left), Box::new(right))),
+                        Box::new(Value(value)),
+                    ),
+                }
+            }
+            (Addition(a, b), Addition(c, d)) => match (*a, *b, *c, *d) {
+                (a, Value(b), c, Value(d)) => Addition(
+                    Box::new(Addition(Box::new(a), Box::new(c))),
+                    Box::new(Value(b + d)),
+                ),
+                (a, b, c, d) => Addition(
+                    Box::new(Addition(Box::new(a), Box::new(b))),
+                    Box::new(Addition(Box::new(c), Box::new(d))),
+                ),
+            },
+            (Value(left), right) => Addition(Box::new(right), Box::new(Value(left))),
             (left, right) => Addition(Box::new(left), Box::new(right)),
         }),
         Subtraction(left, right) => Ok(match (eval(left)?, eval(right)?) {
