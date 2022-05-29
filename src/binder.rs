@@ -24,7 +24,7 @@ pub enum Error<'a> {
 
 type ParserNode<'a> = parser::Node<'a>;
 
-pub fn bind<'a>(node: &ParserNode<'a>) -> Result<Box<Node>, Error<'a>> {
+pub fn bind<'a>(node: &'a ParserNode) -> Result<Box<Node>, Error<'a>> {
     match node {
         ParserNode::Value(value) => Ok(Box::new(Value(*value))),
         ParserNode::Constant(name) => Ok(Box::new(Value(bind_constant(name)?))),
