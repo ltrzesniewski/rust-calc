@@ -1,4 +1,3 @@
-mod binder;
 mod calculator;
 mod lexer;
 mod parser;

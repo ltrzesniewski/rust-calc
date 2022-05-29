@@ -5,7 +5,7 @@ use Node::*;
 #[derive(PartialEq, Debug)]
 pub enum Node<'a> {
     Value(f64),
-    Constant(&'a str),
+    Variable(&'a str),
     Negation(Box<Node<'a>>),
     Addition(Box<Node<'a>>, Box<Node<'a>>),
     Subtraction(Box<Node<'a>>, Box<Node<'a>>),
@@ -156,7 +156,7 @@ impl<'a, T: Iterator<Item = Token<'a>>> Parser<'a, T> {
                     self.consume_token(CloseParen)?;
                     Ok(Box::new(Function(name, expr)))
                 } else {
-                    Ok(Box::new(Constant(name)))
+                    Ok(Box::new(Variable(name)))
                 }
             }
             Some(other) => Err(Error::UnexpectedToken(other)),
@@ -169,7 +169,7 @@ impl Display for Node<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Value(value) => write!(f, "{}", value),
-            Constant(name) => write!(f, "{}", name),
+            Variable(name) => write!(f, "{}", name),
             Negation(node) => write!(f, "-{}", node),
             Addition(left, right) => write!(f, "({} + {})", left, right),
             Subtraction(left, right) => write!(f, "({} - {})", left, right),

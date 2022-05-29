@@ -2,8 +2,8 @@ use rust_calc::*;
 
 #[test]
 fn it_calculates() {
-    assert_eq!(eval_str("2+2").unwrap().value, 4.0);
-    assert_eq!(eval_str("1 + 2 * 3").unwrap().value, 7.0);
+    assert_eq!(eval_str("2+2").unwrap().value(), Some(4.0));
+    assert_eq!(eval_str("1 + 2 * 3").unwrap().value(), Some(7.0));
 }
 
 #[test]
