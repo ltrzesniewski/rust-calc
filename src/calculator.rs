@@ -1,13 +1,13 @@
 use crate::arena::Arena;
-use crate::parser::{Node, Node::*};
+use crate::parser::{Node, Node::*, ParseResult};
 use crate::{lexer, parser};
 use std::cell::Cell;
 use std::fmt::{Display, Formatter};
-use std::ops::Deref;
 
 pub struct EvalResult<'input, 'arena> {
     pub ast: &'arena Node<'input, 'arena>,
-    pub evaluated: &'arena Node<'input, 'arena>,
+    pub intermediate: &'arena Node<'input, 'arena>,
+    pub result: &'arena Node<'input, 'arena>,
     pub arena: Arena<'arena, Node<'input, 'arena>>,
 }
 
@@ -40,16 +40,18 @@ pub fn eval_str<'input, 'arena>(
         return Err(Box::new(error));
     }
 
-    let parse_result = parse_result?;
+    let ParseResult { ast, arena } = parse_result?;
 
-    let calc = Calc::new(&parse_result.arena);
-    let result = calc.eval(parse_result.ast.deref())?;
-    let result = parse_result.arena.alloc(result);
+    let calc = Calc::new(&arena);
+
+    let intermediate = arena.alloc(calc.eval(ast)?);
+    let result = calc.prettify(intermediate);
 
     Ok(EvalResult {
-        ast: parse_result.ast,
-        evaluated: result,
-        arena: parse_result.arena,
+        ast,
+        intermediate,
+        result,
+        arena,
     })
 }
 
@@ -59,67 +61,100 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
     }
 
     fn eval(&self, node: &Node<'input, 'arena>) -> Result<Node<'input, 'arena>, Error<'input>> {
-        return match node {
-            Value(value) => Ok(Value(*value)),
-            Variable(name) => Ok(Self::eval_var(name)),
-            Negation(node) => Ok(match self.eval(node)? {
+        let alloc = |n| self.alloc(n);
+        let eval = |n| self.eval(n);
+
+        Ok(match node {
+            Value(value) => Value(*value),
+            Variable(name) => Self::eval_var(name),
+            Negation(node) => match eval(node)? {
                 Value(value) => Value(-value),
-                other => Negation(self.alloc(other)),
-            }),
-            Addition(left, right) => Ok(match (self.eval(left)?, self.eval(right)?) {
+                Negation(node) => *node,
+                node => Negation(alloc(node)),
+            },
+            Addition(left, right) => match (eval(left)?, eval(right)?) {
                 (Value(left), Value(right)) => Value(left + right),
-                // // Keep constants on the right side
-                // (Addition(left, right), Value(value)) | (Value(value), Addition(left, right)) => {
-                //     match (*left, *right) {
-                //         (Value(value2), other) | (other, Value(value2)) => {
-                //             Addition(self.alloc(other), self.alloc(Value(value + value2)))
-                //         }
-                //         (left, right) => Addition(
-                //             self.alloc(Addition(self.alloc(left), self.alloc(right))),
-                //             self.alloc(Value(value)),
-                //         ),
-                //     }
-                // }
-                // (Addition(a, b), Addition(c, d)) => match (*a, *b, *c, *d) {
-                //     (a, Value(b), c, Value(d)) => Addition(
-                //         self.alloc(Addition(self.alloc(a), self.alloc(c))),
-                //         self.alloc(Value(b + d)),
-                //     ),
-                //     (a, b, c, d) => Addition(
-                //         self.alloc(Addition(self.alloc(a), self.alloc(b))),
-                //         self.alloc(Addition(self.alloc(c), self.alloc(d))),
-                //     ),
-                // },
-                // (Value(left), right) => Addition(self.alloc(right), self.alloc(Value(left))),
-                (left, right) => Addition(self.alloc(left), self.alloc(right)),
-            }),
-            Subtraction(left, right) => Ok(match (self.eval(left)?, self.eval(right)?) {
+
+                (Addition(node_a, Value(val_a)), Addition(node_b, Value(val_b)))
+                | (Addition(Value(val_a), node_a), Addition(node_b, Value(val_b)))
+                | (Addition(node_a, Value(val_a)), Addition(Value(val_b), node_b))
+                | (Addition(Value(val_a), node_a), Addition(Value(val_b), node_b)) => {
+                    Addition(alloc(Addition(node_a, node_b)), alloc(Value(val_a + val_b)))
+                }
+
+                (Addition(inner, Value(ref a)), Value(ref b))
+                | (Addition(Value(ref a), inner), Value(ref b))
+                | (Value(ref a), Addition(inner, Value(ref b)))
+                | (Value(ref a), Addition(Value(ref b), inner)) => {
+                    Addition(inner, alloc(Value(*a + *b)))
+                }
+
+                (left, right) => Addition(alloc(left), alloc(right)),
+            },
+            Subtraction(left, right) => match (eval(left)?, eval(right)?) {
                 (Value(left), Value(right)) => Value(left - right),
-                (left, right) => Subtraction(self.alloc(left), self.alloc(right)),
-            }),
-            Multiplication(left, right) => Ok(match (self.eval(left)?, self.eval(right)?) {
+                (left, right) => eval(&Addition(alloc(left), alloc(Negation(alloc(right)))))?,
+            },
+            Multiplication(left, right) => match (eval(left)?, eval(right)?) {
                 (Value(left), Value(right)) => Value(left * right),
-                (left, right) => Multiplication(self.alloc(left), self.alloc(right)),
-            }),
-            Division(left, right) => Ok(match (self.eval(left)?, self.eval(right)?) {
+                (left, right) => Multiplication(alloc(left), alloc(right)),
+            },
+            Division(left, right) => match (eval(left)?, eval(right)?) {
                 (Value(left), Value(right)) => Value(left / right),
-                (left, right) => Division(self.alloc(left), self.alloc(right)),
-            }),
-            Exponentiation(base, exponent) => Ok(match (self.eval(base)?, self.eval(exponent)?) {
+                (left, right) => Division(alloc(left), alloc(right)),
+            },
+            Exponentiation(base, exponent) => match (eval(base)?, eval(exponent)?) {
                 (Value(base), Value(exponent)) => Value(f64::powf(base, exponent)),
-                (base, exponent) => Exponentiation(self.alloc(base), self.alloc(exponent)),
-            }),
+                (base, exponent) => Exponentiation(alloc(base), alloc(exponent)),
+            },
             Function(name, arg) => {
                 let func = Self::get_func(name)?;
-                let arg = self.eval(arg)?;
-                Ok(if let Value(value) = arg {
+                let arg = eval(arg)?;
+                if let Value(value) = arg {
                     Value(func(value))
                 } else {
-                    Function(name, self.alloc(arg))
-                })
+                    Function(name, alloc(arg))
+                }
             }
-        };
+        })
     }
+
+    fn prettify(&self, node: &Node<'input, 'arena>) -> &'arena Node<'input, 'arena> {
+        let alloc = |n| self.alloc(n);
+
+        alloc(match node {
+            // Real rules
+            Addition(left, Value(right)) if *right < 0.0 => {
+                Subtraction(self.prettify(left), alloc(Value(-*right)))
+            }
+
+            Addition(left, Negation(right)) => {
+                Subtraction(self.prettify(left), self.prettify(right))
+            }
+
+            // Forwarding
+            Value(_) | Variable(_) => *node,
+
+            Negation(inner) => Negation(self.prettify(inner)),
+
+            Addition(left, right) => Addition(self.prettify(left), self.prettify(right)),
+
+            Subtraction(left, right) => Subtraction(self.prettify(left), self.prettify(right)),
+
+            Multiplication(left, right) => {
+                Multiplication(self.prettify(left), self.prettify(right))
+            }
+
+            Division(left, right) => Division(self.prettify(left), self.prettify(right)),
+
+            Exponentiation(left, right) => {
+                Exponentiation(self.prettify(left), self.prettify(right))
+            }
+
+            Function(name, arg) => Function(name, self.prettify(arg)),
+        })
+    }
+
     fn eval_var(name: &str) -> Node {
         match name {
             "pi" => Value(std::f64::consts::PI),
@@ -129,6 +164,7 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
             _ => Variable(name),
         }
     }
+
     fn get_func(name: &str) -> Result<fn(f64) -> f64, Error> {
         match name {
             "round" => Ok(f64::round),
@@ -162,7 +198,7 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
 
 impl EvalResult<'_, '_> {
     pub fn value(&self) -> Option<f64> {
-        if let Value(value) = self.evaluated.deref() {
+        if let Value(value) = self.result {
             Some(*value)
         } else {
             None

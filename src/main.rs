@@ -29,7 +29,11 @@ fn main() -> io::Result<()> {
         match eval_str(input) {
             Ok(result) => {
                 println!("= {}", result.ast);
-                println!("= {}", result.evaluated);
+
+                #[cfg(debug_assertions)]
+                println!("= {}", result.intermediate);
+
+                println!("= {}", result.result);
             }
             Err(error) => eprintln!("{}", error),
         }

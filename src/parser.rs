@@ -3,7 +3,7 @@ use crate::lexer::{Token, Token::*};
 use std::fmt::{Display, Formatter};
 use Node::*;
 
-#[derive(PartialEq, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Node<'input, 'arena> {
     Value(f64),
     Variable(&'input str),

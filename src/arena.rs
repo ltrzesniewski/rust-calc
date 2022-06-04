@@ -17,7 +17,11 @@ impl<'a, T> Arena<'a, T> {
         }
     }
 
-    pub fn alloc(&self, item: T) -> &'a mut T {
+    pub fn alloc(&self, item: T) -> &'a T {
+        self.alloc_mut(item)
+    }
+
+    pub fn alloc_mut(&self, item: T) -> &'a mut T {
         let mut outer = self.vec.borrow_mut();
 
         let mut inner = outer.last_mut();
