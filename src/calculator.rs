@@ -61,7 +61,7 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
     }
 
     fn eval(&self, node: &Node<'input, 'arena>) -> Result<Node<'input, 'arena>, Error<'input>> {
-        let alloc = |n| self.alloc(n);
+        let a = |n| self.alloc(n);
         let eval = |n| self.eval(n);
 
         Ok(match node {
@@ -70,7 +70,7 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
             Negation(node) => match eval(node)? {
                 Value(value) => Value(-value),
                 Negation(node) => *node,
-                node => Negation(alloc(node)),
+                node => Negation(a(node)),
             },
             Addition(left, right) => match (eval(left)?, eval(right)?) {
                 (node, Value(zero)) | (Value(zero), node) if zero == 0.0 => node,
@@ -80,48 +80,48 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
                 | (Addition(Value(val_a), node_a), Addition(node_b, Value(val_b)))
                 | (Addition(node_a, Value(val_a)), Addition(Value(val_b), node_b))
                 | (Addition(Value(val_a), node_a), Addition(Value(val_b), node_b)) => {
-                    Addition(alloc(Addition(node_a, node_b)), alloc(Value(val_a + val_b)))
+                    Addition(a(Addition(node_a, node_b)), a(Value(val_a + val_b)))
                 }
 
-                (Addition(inner, Value(ref a)), Value(ref b))
-                | (Addition(Value(ref a), inner), Value(ref b))
-                | (Value(ref a), Addition(inner, Value(ref b)))
-                | (Value(ref a), Addition(Value(ref b), inner)) => {
-                    Addition(inner, alloc(Value(*a + *b)))
+                (Addition(inner, Value(ref val_a)), Value(ref val_b))
+                | (Addition(Value(ref val_a), inner), Value(ref val_b))
+                | (Value(ref val_a), Addition(inner, Value(ref val_b)))
+                | (Value(ref val_a), Addition(Value(ref val_b), inner)) => {
+                    Addition(inner, a(Value(*val_a + *val_b)))
                 }
 
-                (left, right) => Addition(alloc(left), alloc(right)),
+                (left, right) => Addition(a(left), a(right)),
             },
             Subtraction(left, right) => match (eval(left)?, eval(right)?) {
                 (node, Value(zero)) if zero == 0.0 => node,
                 (Value(left), Value(right)) => Value(left - right),
-                (left, right) => eval(&Addition(alloc(left), alloc(Negation(alloc(right)))))?,
+                (left, right) => eval(&Addition(a(left), a(Negation(a(right)))))?,
             },
             Multiplication(left, right) => match (eval(left)?, eval(right)?) {
                 (_, Value(zero)) | (Value(zero), _) if zero == 0.0 => Value(0.0),
                 (node, Value(one)) | (Value(one), node) if one == 1.0 => node,
                 (Value(left), Value(right)) => Value(left * right),
-                (left, right) => Multiplication(alloc(left), alloc(right)),
+                (left, right) => Multiplication(a(left), a(right)),
             },
             Division(left, right) => match (eval(left)?, eval(right)?) {
                 (Value(zero), Value(zero2)) if zero == 0.0 && zero2 == 0.0 => Value(f64::NAN),
                 (Value(zero), _) if zero == 0.0 => Value(0.0),
                 (node, Value(one)) if one == 1.0 => node,
                 (Value(left), Value(right)) => Value(left / right),
-                (left, right) => Division(alloc(left), alloc(right)),
+                (left, right) => Division(a(left), a(right)),
             },
             Exponentiation(base, exponent) => match (eval(base)?, eval(exponent)?) {
                 (_, Value(zero)) if zero == 0.0 => Value(1.0),
                 (node, Value(one)) if one == 1.0 => node,
                 (Value(base), Value(exponent)) => Value(f64::powf(base, exponent)),
-                (base, exponent) => Exponentiation(alloc(base), alloc(exponent)),
+                (base, exponent) => Exponentiation(a(base), a(exponent)),
             },
             Function(name, arg) => {
                 if *name == "diff" {
                     let diff = self.differentiate(arg)?;
                     return eval(&diff);
                 } else if *name == "__diff" {
-                    return Ok(Function("diff", alloc(eval(arg)?)));
+                    return Ok(Function("diff", a(eval(arg)?)));
                 }
 
                 let func = Self::get_func(name)?;
@@ -129,45 +129,30 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
                 if let Value(value) = arg {
                     Value(func(value))
                 } else {
-                    Function(name, alloc(arg))
+                    Function(name, a(arg))
                 }
             }
         })
     }
 
     fn prettify(&self, node: &Node<'input, 'arena>) -> &'arena Node<'input, 'arena> {
-        let alloc = |n| self.alloc(n);
+        let a = |n| self.alloc(n);
+        let p = |n| self.prettify(n);
 
-        alloc(match node {
+        a(match node {
             // Real rules
-            Addition(left, Value(right)) if *right < 0.0 => {
-                Subtraction(self.prettify(left), alloc(Value(-*right)))
-            }
-
-            Addition(left, Negation(right)) => {
-                Subtraction(self.prettify(left), self.prettify(right))
-            }
+            Addition(left, Value(right)) if *right < 0.0 => Subtraction(p(left), a(Value(-*right))),
+            Addition(left, Negation(right)) => Subtraction(p(left), p(right)),
 
             // Forwarding
             Value(_) | Variable(_) => *node,
-
-            Negation(inner) => Negation(self.prettify(inner)),
-
-            Addition(left, right) => Addition(self.prettify(left), self.prettify(right)),
-
-            Subtraction(left, right) => Subtraction(self.prettify(left), self.prettify(right)),
-
-            Multiplication(left, right) => {
-                Multiplication(self.prettify(left), self.prettify(right))
-            }
-
-            Division(left, right) => Division(self.prettify(left), self.prettify(right)),
-
-            Exponentiation(left, right) => {
-                Exponentiation(self.prettify(left), self.prettify(right))
-            }
-
-            Function(name, arg) => Function(name, self.prettify(arg)),
+            Negation(inner) => Negation(p(inner)),
+            Addition(left, right) => Addition(p(left), p(right)),
+            Subtraction(left, right) => Subtraction(p(left), p(right)),
+            Multiplication(left, right) => Multiplication(p(left), p(right)),
+            Division(left, right) => Division(p(left), p(right)),
+            Exponentiation(left, right) => Exponentiation(p(left), p(right)),
+            Function(name, arg) => Function(name, p(arg)),
         })
     }
 
