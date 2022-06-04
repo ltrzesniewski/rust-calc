@@ -44,31 +44,31 @@ impl<'a> Lexer<'a> {
         loop {
             let c = self.next_char()?;
 
-            return if c.is_whitespace() {
+            return Some(Ok(if c.is_whitespace() {
                 continue;
             } else if let Some(token) = self.read_symbol() {
-                Some(Ok(token))
+                token
             } else if let Some(token) = self.read_number() {
-                Some(Ok(token))
+                token
             } else if let Some(token) = self.read_identifier() {
-                Some(Ok(token))
+                token
             } else {
-                Some(Err(Error::InvalidCharacter(c)))
-            };
+                return Some(Err(Error::InvalidCharacter(c)));
+            }));
         }
     }
 
     fn read_symbol(&self) -> Option<Token<'a>> {
-        match self.current {
-            '+' => Some(Plus),
-            '-' => Some(Minus),
-            '*' => Some(Star),
-            '/' => Some(Slash),
-            '(' => Some(OpenParen),
-            ')' => Some(CloseParen),
-            '^' => Some(Caret),
-            _ => None,
-        }
+        Some(match self.current {
+            '+' => Plus,
+            '-' => Minus,
+            '*' => Star,
+            '/' => Slash,
+            '(' => OpenParen,
+            ')' => CloseParen,
+            '^' => Caret,
+            _ => return None,
+        })
     }
 
     fn read_number(&mut self) -> Option<Token<'a>> {

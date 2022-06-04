@@ -43,7 +43,6 @@ pub fn eval_str<'input, 'arena>(
     let ParseResult { ast, arena } = parse_result?;
 
     let calc = Calc::new(&arena);
-
     let intermediate = arena.alloc(calc.eval(ast)?);
     let result = calc.prettify(intermediate);
 
@@ -156,39 +155,39 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
     }
 
     fn eval_var(name: &str) -> Node {
-        match name {
-            "pi" => Value(std::f64::consts::PI),
-            "e" => Value(std::f64::consts::E),
-            "nan" => Value(f64::NAN), // Why not? :)
-            "inf" => Value(f64::INFINITY),
-            _ => Variable(name),
-        }
+        Value(match name {
+            "pi" => std::f64::consts::PI,
+            "e" => std::f64::consts::E,
+            "nan" => f64::NAN, // Why not? :)
+            "inf" => f64::INFINITY,
+            _ => return Variable(name),
+        })
     }
 
     fn get_func(name: &str) -> Result<fn(f64) -> f64, Error> {
-        match name {
-            "round" => Ok(f64::round),
-            "floor" => Ok(f64::floor),
-            "ceil" => Ok(f64::ceil),
-            "abs" => Ok(f64::abs),
-            "sqrt" => Ok(f64::sqrt),
-            "ln" => Ok(f64::ln),
-            "log2" => Ok(f64::log2),
-            "log10" => Ok(f64::log10),
-            "sin" => Ok(f64::sin),
-            "cos" => Ok(f64::cos),
-            "tan" => Ok(f64::tan),
-            "asin" => Ok(f64::asin),
-            "acos" => Ok(f64::acos),
-            "atan" => Ok(f64::atan),
-            "sinh" => Ok(f64::sinh),
-            "cosh" => Ok(f64::cosh),
-            "tanh" => Ok(f64::tanh),
-            "asinh" => Ok(f64::asinh),
-            "acosh" => Ok(f64::acosh),
-            "atanh" => Ok(f64::atanh),
-            _ => Err(Error::UnknownFunction(name)),
-        }
+        Ok(match name {
+            "round" => f64::round,
+            "floor" => f64::floor,
+            "ceil" => f64::ceil,
+            "abs" => f64::abs,
+            "sqrt" => f64::sqrt,
+            "ln" => f64::ln,
+            "log2" => f64::log2,
+            "log10" => f64::log10,
+            "sin" => f64::sin,
+            "cos" => f64::cos,
+            "tan" => f64::tan,
+            "asin" => f64::asin,
+            "acos" => f64::acos,
+            "atan" => f64::atan,
+            "sinh" => f64::sinh,
+            "cosh" => f64::cosh,
+            "tanh" => f64::tanh,
+            "asinh" => f64::asinh,
+            "acosh" => f64::acosh,
+            "atanh" => f64::atanh,
+            _ => return Err(Error::UnknownFunction(name)),
+        })
     }
 
     fn alloc(&self, node: Node<'input, 'arena>) -> &'arena Node<'input, 'arena> {
