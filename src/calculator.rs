@@ -14,6 +14,7 @@ pub struct EvalResult<'input, 'arena> {
 #[derive(PartialEq, Debug)]
 pub enum Error<'input> {
     UnknownFunction(&'input str),
+    NotImplemented(&'static str),
 }
 
 struct Calc<'calc, 'input, 'arena> {
@@ -72,6 +73,7 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
                 node => Negation(alloc(node)),
             },
             Addition(left, right) => match (eval(left)?, eval(right)?) {
+                (node, Value(zero)) | (Value(zero), node) if zero == 0.0 => node,
                 (Value(left), Value(right)) => Value(left + right),
 
                 (Addition(node_a, Value(val_a)), Addition(node_b, Value(val_b)))
@@ -91,22 +93,37 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
                 (left, right) => Addition(alloc(left), alloc(right)),
             },
             Subtraction(left, right) => match (eval(left)?, eval(right)?) {
+                (node, Value(zero)) if zero == 0.0 => node,
                 (Value(left), Value(right)) => Value(left - right),
                 (left, right) => eval(&Addition(alloc(left), alloc(Negation(alloc(right)))))?,
             },
             Multiplication(left, right) => match (eval(left)?, eval(right)?) {
+                (_, Value(zero)) | (Value(zero), _) if zero == 0.0 => Value(0.0),
+                (node, Value(one)) | (Value(one), node) if one == 1.0 => node,
                 (Value(left), Value(right)) => Value(left * right),
                 (left, right) => Multiplication(alloc(left), alloc(right)),
             },
             Division(left, right) => match (eval(left)?, eval(right)?) {
+                (Value(zero), Value(zero2)) if zero == 0.0 && zero2 == 0.0 => Value(f64::NAN),
+                (Value(zero), _) if zero == 0.0 => Value(0.0),
+                (node, Value(one)) if one == 1.0 => node,
                 (Value(left), Value(right)) => Value(left / right),
                 (left, right) => Division(alloc(left), alloc(right)),
             },
             Exponentiation(base, exponent) => match (eval(base)?, eval(exponent)?) {
+                (_, Value(zero)) if zero == 0.0 => Value(1.0),
+                (node, Value(one)) if one == 1.0 => node,
                 (Value(base), Value(exponent)) => Value(f64::powf(base, exponent)),
                 (base, exponent) => Exponentiation(alloc(base), alloc(exponent)),
             },
             Function(name, arg) => {
+                if *name == "diff" {
+                    let diff = self.differentiate(arg)?;
+                    return eval(&diff);
+                } else if *name == "__diff" {
+                    return Ok(Function("diff", alloc(eval(arg)?)));
+                }
+
                 let func = Self::get_func(name)?;
                 let arg = eval(arg)?;
                 if let Value(value) = arg {
@@ -190,6 +207,66 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
         })
     }
 
+    fn differentiate(
+        &self,
+        node: &'arena Node<'input, 'arena>,
+    ) -> Result<Node<'input, 'arena>, Error<'input>> {
+        let alloc = |n| self.alloc(n);
+        let diff = |n| self.differentiate(n);
+
+        Ok(match node {
+            Value(_) => Value(0.0),
+            Variable(name) => {
+                if *name == "x" {
+                    Value(1.0)
+                } else {
+                    Value(0.0)
+                }
+            }
+            Negation(inner) => Negation(alloc(diff(inner)?)),
+            Addition(left, right) => Addition(alloc(diff(left)?), alloc(diff(right)?)),
+            Subtraction(left, right) => Subtraction(alloc(diff(left)?), alloc(diff(right)?)),
+            Multiplication(left, right) => Addition(
+                alloc(Multiplication(alloc(diff(left)?), right)),
+                alloc(Multiplication(left, alloc(diff(right)?))),
+            ),
+            Division(left, right) => Division(
+                alloc(Subtraction(
+                    alloc(Multiplication(alloc(diff(left)?), right)),
+                    alloc(Multiplication(left, alloc(diff(right)?))),
+                )),
+                alloc(Exponentiation(right, alloc(Value(2.0)))),
+            ),
+            Exponentiation(base, Value(exponent)) => Multiplication(
+                alloc(Multiplication(
+                    alloc(Value(*exponent)),
+                    alloc(Exponentiation(base, alloc(Value(exponent - 1.0)))),
+                )),
+                alloc(diff(base)?),
+            ),
+            Function("ln", arg) => Division(alloc(diff(arg)?), arg),
+            Function("sqrt", arg) => Division(
+                alloc(diff(arg)?),
+                alloc(Multiplication(
+                    alloc(Value(2.0)),
+                    alloc(Function("sqrt", arg)),
+                )),
+            ),
+            Function("sin", arg) => Multiplication(alloc(diff(arg)?), alloc(Function("cos", arg))),
+            Function("cos", arg) => Multiplication(
+                alloc(diff(arg)?),
+                alloc(Negation(alloc(Function("sin", arg)))),
+            ),
+            Function("diff", arg) => diff(alloc(diff(arg)?))?,
+            Function(_, _) => Function("__diff", node), // Avoid infinite recursion
+            _ => {
+                return Err(Error::NotImplemented(
+                    "Could not differentiate this expression",
+                ))
+            }
+        })
+    }
+
     fn alloc(&self, node: Node<'input, 'arena>) -> &'arena Node<'input, 'arena> {
         self.arena.alloc(node)
     }
@@ -209,6 +286,7 @@ impl Display for Error<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::UnknownFunction(name) => write!(f, "Unknown function: {}", name),
+            Error::NotImplemented(msg) => write!(f, "Not implemented: {}", msg),
         }
     }
 }
