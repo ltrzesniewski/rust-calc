@@ -1,3 +1,4 @@
+mod arena;
 mod calculator;
 mod lexer;
 mod parser;
