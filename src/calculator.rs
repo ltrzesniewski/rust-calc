@@ -211,8 +211,13 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
         &self,
         node: &'arena Node<'input, 'arena>,
     ) -> Result<Node<'input, 'arena>, Error<'input>> {
-        let alloc = |n| self.alloc(n);
-        let diff = |n| self.differentiate(n);
+        let a = |n| self.alloc(n);
+
+        macro_rules! d {
+            ($node:expr) => {
+                self.alloc(self.differentiate($node)?)
+            };
+        }
 
         Ok(match node {
             Value(_) => Value(0.0),
@@ -223,46 +228,40 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
                     Value(0.0)
                 }
             }
-            Negation(inner) => Negation(alloc(diff(inner)?)),
-            Addition(left, right) => Addition(alloc(diff(left)?), alloc(diff(right)?)),
-            Subtraction(left, right) => Subtraction(alloc(diff(left)?), alloc(diff(right)?)),
+            Negation(inner) => Negation(d!(inner)),
+            Addition(left, right) => Addition(d!(left), d!(right)),
+            Subtraction(left, right) => Subtraction(d!(left), d!(right)),
             Multiplication(left, right) => Addition(
-                alloc(Multiplication(alloc(diff(left)?), right)),
-                alloc(Multiplication(left, alloc(diff(right)?))),
+                a(Multiplication(d!(left), right)),
+                a(Multiplication(left, d!(right))),
             ),
             Division(left, right) => Division(
-                alloc(Subtraction(
-                    alloc(Multiplication(alloc(diff(left)?), right)),
-                    alloc(Multiplication(left, alloc(diff(right)?))),
+                a(Subtraction(
+                    a(Multiplication(d!(left), right)),
+                    a(Multiplication(left, d!(right))),
                 )),
-                alloc(Exponentiation(right, alloc(Value(2.0)))),
+                a(Exponentiation(right, a(Value(2.0)))),
             ),
             Exponentiation(base, Value(exponent)) => Multiplication(
-                alloc(Multiplication(
-                    alloc(Value(*exponent)),
-                    alloc(Exponentiation(base, alloc(Value(exponent - 1.0)))),
+                a(Multiplication(
+                    a(Value(*exponent)),
+                    a(Exponentiation(base, a(Value(exponent - 1.0)))),
                 )),
-                alloc(diff(base)?),
+                d!(base),
             ),
-            Function("ln", arg) => Division(alloc(diff(arg)?), arg),
+            Function("ln", arg) => Division(d!(arg), arg),
             Function("sqrt", arg) => Division(
-                alloc(diff(arg)?),
-                alloc(Multiplication(
-                    alloc(Value(2.0)),
-                    alloc(Function("sqrt", arg)),
-                )),
+                d!(arg),
+                a(Multiplication(a(Value(2.0)), a(Function("sqrt", arg)))),
             ),
-            Function("sin", arg) => Multiplication(alloc(diff(arg)?), alloc(Function("cos", arg))),
-            Function("cos", arg) => Multiplication(
-                alloc(diff(arg)?),
-                alloc(Negation(alloc(Function("sin", arg)))),
-            ),
-            Function("diff", arg) => diff(alloc(diff(arg)?))?,
+            Function("sin", arg) => Multiplication(d!(arg), a(Function("cos", arg))),
+            Function("cos", arg) => Multiplication(d!(arg), a(Negation(a(Function("sin", arg))))),
+            Function("diff", arg) => self.differentiate(d!(arg))?,
             Function(_, _) => Function("__diff", node), // Avoid infinite recursion
             _ => {
                 return Err(Error::NotImplemented(
                     "Could not differentiate this expression",
-                ))
+                ));
             }
         })
     }
