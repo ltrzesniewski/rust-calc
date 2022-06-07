@@ -12,8 +12,7 @@ pub struct EvalResult<'input, 'arena> {
 }
 
 #[derive(PartialEq, Debug)]
-pub enum Error<'input> {
-    UnknownFunction(&'input str),
+pub enum Error {
     NotImplemented(&'static str),
 }
 
@@ -60,7 +59,7 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
         Calc { arena }
     }
 
-    fn eval(&self, node: &Node<'input, 'arena>) -> Result<Node<'input, 'arena>, Error<'input>> {
+    fn eval(&self, node: &Node<'input, 'arena>) -> Result<Node<'input, 'arena>, Error> {
         let a = |n| self.alloc(n);
         let eval = |n| self.eval(n);
 
@@ -116,22 +115,22 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
                 (Value(base), Value(exponent)) => Value(f64::powf(base, exponent)),
                 (base, exponent) => Exponentiation(a(base), a(exponent)),
             },
-            Function(name, arg) => {
-                if *name == "diff" {
-                    let diff = self.differentiate(arg)?;
-                    return eval(&diff);
-                } else if *name == "__diff" {
-                    return Ok(Function("diff", a(eval(arg)?)));
+            Function(name, arg) => match *name {
+                "diff" => eval(&self.differentiate(arg)?)?,
+                "__diff" => Function("diff", a(eval(arg)?)),
+                _ => {
+                    if let Some(func) = Self::get_func(name) {
+                        let arg = eval(arg)?;
+                        if let Value(value) = arg {
+                            Value(func(value))
+                        } else {
+                            Function(name, a(arg))
+                        }
+                    } else {
+                        Function(name, a(eval(arg)?))
+                    }
                 }
-
-                let func = Self::get_func(name)?;
-                let arg = eval(arg)?;
-                if let Value(value) = arg {
-                    Value(func(value))
-                } else {
-                    Function(name, a(arg))
-                }
-            }
+            },
         })
     }
 
@@ -166,8 +165,8 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
         })
     }
 
-    fn get_func(name: &str) -> Result<fn(f64) -> f64, Error> {
-        Ok(match name {
+    fn get_func(name: &str) -> Option<fn(f64) -> f64> {
+        Some(match name {
             "round" => f64::round,
             "floor" => f64::floor,
             "ceil" => f64::ceil,
@@ -188,14 +187,14 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
             "asinh" => f64::asinh,
             "acosh" => f64::acosh,
             "atanh" => f64::atanh,
-            _ => return Err(Error::UnknownFunction(name)),
+            _ => return None,
         })
     }
 
     fn differentiate(
         &self,
         node: &'arena Node<'input, 'arena>,
-    ) -> Result<Node<'input, 'arena>, Error<'input>> {
+    ) -> Result<Node<'input, 'arena>, Error> {
         let a = |n| self.alloc(n);
 
         macro_rules! d {
@@ -266,13 +265,12 @@ impl EvalResult<'_, '_> {
     }
 }
 
-impl Display for Error<'_> {
+impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::UnknownFunction(name) => write!(f, "Unknown function: {}", name),
             Error::NotImplemented(msg) => write!(f, "Not implemented: {}", msg),
         }
     }
 }
 
-impl std::error::Error for Error<'_> {}
+impl std::error::Error for Error {}
