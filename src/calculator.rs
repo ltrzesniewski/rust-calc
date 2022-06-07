@@ -1,5 +1,5 @@
 use crate::arena::Arena;
-use crate::parser::{Node, Node::*, ParseResult};
+use crate::parser::{Node, Node::*};
 use crate::{lexer, parser};
 use std::cell::Cell;
 use std::fmt::{Display, Formatter};
@@ -34,15 +34,15 @@ pub fn eval_str<'input, 'arena>(
         }
     });
 
-    let parse_result = parser::parse(tokens);
+    let arena = Arena::new();
+    let ast = parser::parse(tokens, &arena);
 
     // Lexer errors should be returned first
     if let Some(error) = lexer_error.get() {
         return Err(Box::new(error));
     }
 
-    let ParseResult { ast, arena } = parse_result?;
-
+    let ast = ast?;
     let calc = Calc::new(&arena);
     let intermediate = arena.alloc(calc.eval(ast)?);
     let result = calc.prettify(intermediate);
