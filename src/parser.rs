@@ -4,40 +4,40 @@ use std::fmt::{Display, Formatter};
 use Node::*;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub enum Node<'input, 'arena> {
+pub enum Node<'a> {
     Value(f64),
-    Variable(&'input str),
-    Negation(&'arena Node<'input, 'arena>),
-    Addition(&'arena Node<'input, 'arena>, &'arena Node<'input, 'arena>),
-    Subtraction(&'arena Node<'input, 'arena>, &'arena Node<'input, 'arena>),
-    Multiplication(&'arena Node<'input, 'arena>, &'arena Node<'input, 'arena>),
-    Division(&'arena Node<'input, 'arena>, &'arena Node<'input, 'arena>),
-    Exponentiation(&'arena Node<'input, 'arena>, &'arena Node<'input, 'arena>),
-    Function(&'input str, &'arena Node<'input, 'arena>),
+    Variable(&'a str),
+    Negation(&'a Node<'a>),
+    Addition(&'a Node<'a>, &'a Node<'a>),
+    Subtraction(&'a Node<'a>, &'a Node<'a>),
+    Multiplication(&'a Node<'a>, &'a Node<'a>),
+    Division(&'a Node<'a>, &'a Node<'a>),
+    Exponentiation(&'a Node<'a>, &'a Node<'a>),
+    Function(&'a str, &'a Node<'a>),
 }
 
 #[derive(PartialEq, Debug)]
-pub enum Error<'input> {
+pub enum Error<'a> {
     EmptyStream,
-    UnexpectedToken(Token<'input>),
+    UnexpectedToken(Token<'a>),
     UnexpectedEndOfStream,
-    UnexpectedTrailingToken(Token<'input>),
+    UnexpectedTrailingToken(Token<'a>),
 }
 
-struct Parser<'parser, 'input, 'arena, T: Iterator<Item = Token<'input>>> {
+struct Parser<'a, 'b, T: Iterator<Item = Token<'a>>> {
     // This is an LL(1) parser
     iter: T,
-    current: Option<Token<'input>>,
-    next: Option<Token<'input>>,
-    arena: &'parser Arena<'arena, Node<'input, 'arena>>,
+    current: Option<Token<'a>>,
+    next: Option<Token<'a>>,
+    arena: &'b Arena<'a, Node<'a>>,
 }
 
-type NodeResult<'input, 'arena> = Result<&'arena Node<'input, 'arena>, Error<'input>>;
+type NodeResult<'a> = Result<&'a Node<'a>, Error<'a>>;
 
-pub fn parse<'input, 'arena>(
-    tokens: impl IntoIterator<Item = Token<'input>>,
-    arena: &Arena<'arena, Node<'input, 'arena>>,
-) -> Result<&'arena Node<'input, 'arena>, Error<'input>> {
+pub fn parse<'a>(
+    tokens: impl IntoIterator<Item = Token<'a>>,
+    arena: &Arena<'a, Node<'a>>,
+) -> Result<&'a Node<'a>, Error<'a>> {
     let mut parser = Parser::new(tokens.into_iter().fuse(), arena);
 
     if parser.current == None {
@@ -53,13 +53,8 @@ pub fn parse<'input, 'arena>(
     Ok(expr)
 }
 
-impl<'parser, 'input, 'arena, T: Iterator<Item = Token<'input>>>
-    Parser<'parser, 'input, 'arena, T>
-{
-    fn new(
-        tokens: T,
-        arena: &'parser Arena<'arena, Node<'input, 'arena>>,
-    ) -> Parser<'parser, 'input, 'arena, T> {
+impl<'a, 'b, T: Iterator<Item = Token<'a>>> Parser<'a, 'b, T> {
+    fn new(tokens: T, arena: &'b Arena<'a, Node<'a>>) -> Parser<'a, 'b, T> {
         let mut iter = tokens;
         let (current, next) = (iter.next(), iter.next());
 
@@ -75,7 +70,7 @@ impl<'parser, 'input, 'arena, T: Iterator<Item = Token<'input>>>
         (self.current, self.next) = (self.next, self.iter.next());
     }
 
-    fn consume_token(&mut self, token: Token) -> Result<(), Error<'input>> {
+    fn consume_token(&mut self, token: Token) -> Result<(), Error<'a>> {
         return match self.current {
             Some(current) if current == token => {
                 self.next_token();
@@ -86,11 +81,11 @@ impl<'parser, 'input, 'arena, T: Iterator<Item = Token<'input>>>
         };
     }
 
-    fn parse_expression(&mut self) -> NodeResult<'input, 'arena> {
+    fn parse_expression(&mut self) -> NodeResult<'a> {
         self.parse_terms()
     }
 
-    fn parse_terms(&mut self) -> NodeResult<'input, 'arena> {
+    fn parse_terms(&mut self) -> NodeResult<'a> {
         let mut left = self.parse_factors()?;
 
         loop {
@@ -107,7 +102,7 @@ impl<'parser, 'input, 'arena, T: Iterator<Item = Token<'input>>>
         }
     }
 
-    fn parse_factors(&mut self) -> NodeResult<'input, 'arena> {
+    fn parse_factors(&mut self) -> NodeResult<'a> {
         let mut left = self.parse_exponents()?;
 
         loop {
@@ -124,7 +119,7 @@ impl<'parser, 'input, 'arena, T: Iterator<Item = Token<'input>>>
         }
     }
 
-    fn parse_exponents(&mut self) -> NodeResult<'input, 'arena> {
+    fn parse_exponents(&mut self) -> NodeResult<'a> {
         let mut left = self.parse_unary()?;
 
         loop {
@@ -139,7 +134,7 @@ impl<'parser, 'input, 'arena, T: Iterator<Item = Token<'input>>>
         }
     }
 
-    fn parse_unary(&mut self) -> NodeResult<'input, 'arena> {
+    fn parse_unary(&mut self) -> NodeResult<'a> {
         return match self.current {
             Some(Number(value)) => {
                 self.next_token();
@@ -177,7 +172,7 @@ impl<'parser, 'input, 'arena, T: Iterator<Item = Token<'input>>>
     }
 }
 
-impl Display for Node<'_, '_> {
+impl Display for Node<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Value(value) => write!(f, "{}", value),

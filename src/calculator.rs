@@ -4,11 +4,11 @@ use crate::{lexer, parser};
 use std::cell::Cell;
 use std::fmt::{Display, Formatter};
 
-pub struct EvalResult<'input, 'arena> {
-    pub ast: &'arena Node<'input, 'arena>,
-    pub intermediate: &'arena Node<'input, 'arena>,
-    pub result: &'arena Node<'input, 'arena>,
-    pub arena: Arena<'arena, Node<'input, 'arena>>,
+pub struct EvalResult<'a> {
+    pub ast: &'a Node<'a>,
+    pub intermediate: &'a Node<'a>,
+    pub result: &'a Node<'a>,
+    pub arena: Arena<'a, Node<'a>>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -16,13 +16,11 @@ pub enum Error {
     NotImplemented(&'static str),
 }
 
-struct Calc<'calc, 'input, 'arena> {
-    arena: &'calc Arena<'arena, Node<'input, 'arena>>,
+struct Calc<'a, 'b> {
+    arena: &'b Arena<'a, Node<'a>>,
 }
 
-pub fn eval_str<'input, 'arena>(
-    input: &'input str,
-) -> Result<EvalResult<'input, 'arena>, Box<dyn std::error::Error + 'input>> {
+pub fn eval_str<'a>(input: &'a str) -> Result<EvalResult<'a>, Box<dyn std::error::Error + 'a>> {
     let lexer_error = Cell::new(None);
 
     let tokens = lexer::lex(input).map_while(|item| match item {
@@ -54,12 +52,12 @@ pub fn eval_str<'input, 'arena>(
     })
 }
 
-impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
-    fn new(arena: &'calc Arena<'arena, Node<'input, 'arena>>) -> Calc<'calc, 'input, 'arena> {
+impl<'a, 'b> Calc<'a, 'b> {
+    fn new(arena: &'b Arena<'a, Node<'a>>) -> Calc<'a, 'b> {
         Calc { arena }
     }
 
-    fn eval(&self, node: &Node<'input, 'arena>) -> Result<Node<'input, 'arena>, Error> {
+    fn eval(&self, node: &Node<'a>) -> Result<Node<'a>, Error> {
         let a = |n| self.alloc(n);
         let eval = |n| self.eval(n);
 
@@ -134,7 +132,7 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
         })
     }
 
-    fn prettify(&self, node: &Node<'input, 'arena>) -> &'arena Node<'input, 'arena> {
+    fn prettify(&self, node: &Node<'a>) -> &'a Node<'a> {
         let a = |n| self.alloc(n);
         let p = |n| self.prettify(n);
 
@@ -191,10 +189,7 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
         })
     }
 
-    fn differentiate(
-        &self,
-        node: &'arena Node<'input, 'arena>,
-    ) -> Result<Node<'input, 'arena>, Error> {
+    fn differentiate(&self, node: &'a Node<'a>) -> Result<Node<'a>, Error> {
         let a = |n| self.alloc(n);
 
         macro_rules! d {
@@ -250,12 +245,12 @@ impl<'calc, 'input, 'arena> Calc<'calc, 'input, 'arena> {
         })
     }
 
-    fn alloc(&self, node: Node<'input, 'arena>) -> &'arena Node<'input, 'arena> {
+    fn alloc(&self, node: Node<'a>) -> &'a Node<'a> {
         self.arena.alloc(node)
     }
 }
 
-impl EvalResult<'_, '_> {
+impl EvalResult<'_> {
     pub fn value(&self) -> Option<f64> {
         if let Value(value) = self.result {
             Some(*value)
