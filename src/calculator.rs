@@ -8,7 +8,6 @@ pub struct EvalResult<'a> {
     pub ast: &'a Node<'a>,
     pub intermediate: &'a Node<'a>,
     pub result: &'a Node<'a>,
-    pub arena: Arena<'a, Node<'a>>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -16,11 +15,14 @@ pub enum Error {
     NotImplemented(&'static str),
 }
 
-struct Calc<'a, 'b> {
-    arena: &'b Arena<'a, Node<'a>>,
+struct Calc<'a> {
+    arena: &'a Arena<Node<'a>>,
 }
 
-pub fn eval_str<'a>(input: &'a str) -> Result<EvalResult<'a>, Box<dyn std::error::Error + 'a>> {
+pub fn eval_str<'a>(
+    input: &'a str,
+    arena: &'a Arena<Node<'a>>,
+) -> Result<EvalResult<'a>, Box<dyn std::error::Error + 'a>> {
     let lexer_error = Cell::new(None);
 
     let tokens = lexer::lex(input).map_while(|item| match item {
@@ -31,7 +33,6 @@ pub fn eval_str<'a>(input: &'a str) -> Result<EvalResult<'a>, Box<dyn std::error
         }
     });
 
-    let arena = Arena::new();
     let ast = parser::parse(tokens, &arena);
 
     // Lexer errors should be returned first
@@ -48,12 +49,11 @@ pub fn eval_str<'a>(input: &'a str) -> Result<EvalResult<'a>, Box<dyn std::error
         ast,
         intermediate,
         result,
-        arena,
     })
 }
 
-impl<'a, 'b> Calc<'a, 'b> {
-    fn new(arena: &'b Arena<'a, Node<'a>>) -> Calc<'a, 'b> {
+impl<'a> Calc<'a> {
+    fn new(arena: &'a Arena<Node<'a>>) -> Calc<'a> {
         Calc { arena }
     }
 

@@ -26,7 +26,9 @@ fn main() -> io::Result<()> {
             break;
         }
 
-        match eval_str(input) {
+        let arena = Arena::new();
+
+        match eval_str(input, &arena) {
             Ok(result) => {
                 println!("= {}", result.ast);
 
@@ -36,7 +38,7 @@ fn main() -> io::Result<()> {
                 println!("= {}", result.result);
             }
             Err(error) => eprintln!("{}", error),
-        }
+        };
     }
 
     Ok(())

@@ -24,19 +24,19 @@ pub enum Error<'a> {
     UnexpectedTrailingToken(Token<'a>),
 }
 
-struct Parser<'a, 'b, T: Iterator<Item = Token<'a>>> {
+struct Parser<'a, T: Iterator<Item = Token<'a>>> {
     // This is an LL(1) parser
     iter: T,
     current: Option<Token<'a>>,
     next: Option<Token<'a>>,
-    arena: &'b Arena<'a, Node<'a>>,
+    arena: &'a Arena<Node<'a>>,
 }
 
 type NodeResult<'a> = Result<&'a Node<'a>, Error<'a>>;
 
 pub fn parse<'a>(
     tokens: impl IntoIterator<Item = Token<'a>>,
-    arena: &Arena<'a, Node<'a>>,
+    arena: &'a Arena<Node<'a>>,
 ) -> Result<&'a Node<'a>, Error<'a>> {
     let mut parser = Parser::new(tokens.into_iter().fuse(), arena);
 
@@ -53,8 +53,8 @@ pub fn parse<'a>(
     Ok(expr)
 }
 
-impl<'a, 'b, T: Iterator<Item = Token<'a>>> Parser<'a, 'b, T> {
-    fn new(tokens: T, arena: &'b Arena<'a, Node<'a>>) -> Parser<'a, 'b, T> {
+impl<'a, T: Iterator<Item = Token<'a>>> Parser<'a, T> {
+    fn new(tokens: T, arena: &'a Arena<Node<'a>>) -> Parser<'a, T> {
         let mut iter = tokens;
         let (current, next) = (iter.next(), iter.next());
 
@@ -208,7 +208,7 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn valid() {
-        let  arena = Arena::new();
+        let arena = Arena::new();
 
         //  -1 + 2*3 - 4/5^6 + 7
         let result = parse([
@@ -257,13 +257,15 @@ mod tests {
 
     #[test]
     fn empty() {
-        let result = parse([].into_iter(), &Arena::new());
+        let arena = Arena::new();
+        let result = parse([].into_iter(), &arena);
         assert_eq!(result.unwrap_err(), Error::EmptyStream)
     }
 
     #[test]
     fn trailing() {
-        let result = parse([Number(1.0), Number(2.0)].into_iter(), &Arena::new());
+        let arena = Arena::new();
+        let result = parse([Number(1.0), Number(2.0)].into_iter(), &arena);
         assert_eq!(
             result.unwrap_err(),
             Error::UnexpectedTrailingToken(Number(2.0))
@@ -272,13 +274,15 @@ mod tests {
 
     #[test]
     fn unexpected_eof() {
-        let result = parse([Minus].into_iter(), &Arena::new());
+        let arena = Arena::new();
+        let result = parse([Minus].into_iter(), &arena);
         assert_eq!(result.unwrap_err(), Error::UnexpectedEndOfStream)
     }
 
     #[test]
     fn unexpected_eof_2() {
-        let result = parse([Number(1.0), Minus].into_iter(), &Arena::new());
+        let arena = Arena::new();
+        let result = parse([Number(1.0), Minus].into_iter(), &arena);
         assert_eq!(result.unwrap_err(), Error::UnexpectedEndOfStream)
     }
 }

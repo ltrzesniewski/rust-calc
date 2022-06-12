@@ -1,27 +1,22 @@
 use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
 
-pub struct Arena<'a, T> {
+pub struct Arena<T> {
     vec: RefCell<Vec<Vec<T>>>,
-    _p: PhantomData<&'a T>,
 }
 
-impl<'a, T> Arena<'a, T> {
+impl<T> Arena<T> {
     const ALLOC_QUANTA: usize = 32;
 
-    pub fn new() -> Arena<'a, T> {
-        Arena {
-            vec: vec![].into(),
-            _p: PhantomData,
-        }
+    pub fn new() -> Arena<T> {
+        Arena { vec: vec![].into() }
     }
 
-    pub fn alloc(&self, item: T) -> &'a T {
+    pub fn alloc(&self, item: T) -> &T {
         self.alloc_mut(item)
     }
 
-    pub fn alloc_mut(&self, item: T) -> &'a mut T {
+    pub fn alloc_mut(&self, item: T) -> &mut T {
         let mut outer = self.vec.borrow_mut();
 
         let mut inner = outer.last_mut();
@@ -52,7 +47,7 @@ impl<'a, T> Arena<'a, T> {
     }
 }
 
-impl<'a, T> Debug for Arena<'a, T> {
+impl<T> Debug for Arena<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Arena of {}", self.len())
     }
