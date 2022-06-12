@@ -18,20 +18,14 @@ impl<T> Arena<T> {
 
     pub fn alloc_mut(&self, item: T) -> &mut T {
         let mut outer = self.vec.borrow_mut();
-
         let mut inner = outer.last_mut();
-        if inner.is_none() {
+
+        if inner.is_none() || matches!(inner, Some(ref i) if i.len() >= Self::ALLOC_QUANTA) {
             outer.push(Vec::with_capacity(Self::ALLOC_QUANTA));
             inner = outer.last_mut();
         }
 
-        let mut inner = inner.unwrap();
-
-        if inner.len() == Self::ALLOC_QUANTA {
-            outer.push(Vec::with_capacity(Self::ALLOC_QUANTA));
-            inner = outer.last_mut().unwrap();
-        }
-
+        let inner = inner.unwrap();
         let idx = inner.len();
         inner.push(item);
         unsafe { &mut *inner.as_mut_ptr().add(idx) }
