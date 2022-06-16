@@ -128,7 +128,7 @@ impl<'a, T: Iterator<Item = Token<'a>>> Parser<'a, T> {
             }
 
             self.next_token();
-            let right = self.parse_unary()?;
+            let right = self.parse_exponents()?;
 
             left = self.arena.alloc(Exponentiation(left, right))
         }
@@ -253,6 +253,34 @@ mod tests {
                 arena.alloc(Value(7.0)),
             ))
         )
+    }
+
+    #[test]
+    fn exponentiation_is_right_associative() {
+        let arena = Arena::new();
+
+        let result = parse(
+            [
+                Identifier("a"),
+                Caret,
+                Identifier("b"),
+                Caret,
+                Identifier("c"),
+            ]
+            .into_iter(),
+            &arena,
+        );
+
+        assert_eq!(
+            result.unwrap(),
+            arena.alloc(Exponentiation(
+                arena.alloc(Variable("a")),
+                arena.alloc(Exponentiation(
+                    arena.alloc(Variable("b")),
+                    arena.alloc(Variable("c")),
+                ))
+            ))
+        );
     }
 
     #[test]
