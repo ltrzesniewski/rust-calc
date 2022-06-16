@@ -216,48 +216,52 @@ mod tests {
     #[rustfmt::skip]
     fn valid() {
         let arena = Arena::new();
+        let a = |n| arena.alloc(n);
 
         //  -1 + 2*3 - 4/5^6 + 7
-        let result = parse([
-            Minus,
-            Number(1.0),
-            Plus,
-            Number(2.0),
-            Star,
-            Number(3.0),
-            Minus,
-            Number(4.0),
-            Slash,
-            Number(5.0),
-            Caret,
-            Number(6.0),
-            Plus,
-            Number(7.0),
-        ].into_iter(), &arena);
+        let result = parse(
+            [
+                Minus,
+                Number(1.0),
+                Plus,
+                Number(2.0),
+                Star,
+                Number(3.0),
+                Minus,
+                Number(4.0),
+                Slash,
+                Number(5.0),
+                Caret,
+                Number(6.0),
+                Plus,
+                Number(7.0),
+            ],
+            &arena,
+        );
 
         assert_eq!(
             result.unwrap(),
 
-            arena.alloc(Addition(
-                arena.alloc(Subtraction(
-                    arena.alloc(Addition(
-                        arena.alloc(Negation(
-                            arena.alloc(Value(1.0))
+            a(Addition(
+                a(Subtraction(
+                    a(Addition(
+                        a(Negation(
+                            a(Value(1.0))
                         )),
-                        arena.alloc(Multiplication(
-                            arena.alloc(Value(2.0)),
-                            arena.alloc(Value(3.0)),
+                        a(Multiplication(
+                            a(Value(2.0)),
+                            a(Value(3.0)),
                         )),
                     )),
-                    arena.alloc(Division(
-                        arena.alloc(Value(4.0)),
-                        arena.alloc(Exponentiation(
-                            arena.alloc(Value(5.0)),
-                            arena.alloc(Value(6.0)),
+                    a(Division(
+                        a(Value(4.0)),
+                        a(Exponentiation(
+                            a(Value(5.0)),
+                            a(Value(6.0)),
                         )),
                     )),
                 )),
-                arena.alloc(Value(7.0)),
+                a(Value(7.0)),
             ))
         )
     }
@@ -265,6 +269,7 @@ mod tests {
     #[test]
     fn exponentiation_is_right_associative() {
         let arena = Arena::new();
+        let a = |n| arena.alloc(n);
 
         let result = parse(
             [
@@ -273,19 +278,15 @@ mod tests {
                 Identifier("b"),
                 Caret,
                 Identifier("c"),
-            ]
-            .into_iter(),
+            ],
             &arena,
         );
 
         assert_eq!(
             result.unwrap(),
-            arena.alloc(Exponentiation(
-                arena.alloc(Variable("a")),
-                arena.alloc(Exponentiation(
-                    arena.alloc(Variable("b")),
-                    arena.alloc(Variable("c")),
-                ))
+            a(Exponentiation(
+                a(Variable("a")),
+                a(Exponentiation(a(Variable("b")), a(Variable("c")),))
             ))
         );
     }
@@ -293,17 +294,18 @@ mod tests {
     #[test]
     fn unary_minus() {
         let arena = Arena::new();
+        let a = |n| arena.alloc(n);
 
         let result = parse(
-            [Minus, Identifier("a"), Caret, Minus, Identifier("b")].into_iter(),
+            [Minus, Identifier("a"), Caret, Minus, Identifier("b")],
             &arena,
         );
 
         assert_eq!(
             result.unwrap(),
-            arena.alloc(Negation(arena.alloc(Exponentiation(
-                arena.alloc(Variable("a")),
-                arena.alloc(Negation(arena.alloc(Variable("b")))),
+            a(Negation(a(Exponentiation(
+                a(Variable("a")),
+                a(Negation(a(Variable("b")))),
             ))))
         );
     }
@@ -311,14 +313,14 @@ mod tests {
     #[test]
     fn empty() {
         let arena = Arena::new();
-        let result = parse([].into_iter(), &arena);
+        let result = parse([], &arena);
         assert_eq!(result.unwrap_err(), Error::EmptyStream)
     }
 
     #[test]
     fn trailing() {
         let arena = Arena::new();
-        let result = parse([Number(1.0), Number(2.0)].into_iter(), &arena);
+        let result = parse([Number(1.0), Number(2.0)], &arena);
         assert_eq!(
             result.unwrap_err(),
             Error::UnexpectedTrailingToken(Number(2.0))
@@ -328,14 +330,14 @@ mod tests {
     #[test]
     fn unexpected_eof() {
         let arena = Arena::new();
-        let result = parse([Minus].into_iter(), &arena);
+        let result = parse([Minus], &arena);
         assert_eq!(result.unwrap_err(), Error::UnexpectedEndOfStream)
     }
 
     #[test]
     fn unexpected_eof_2() {
         let arena = Arena::new();
-        let result = parse([Number(1.0), Minus].into_iter(), &arena);
+        let result = parse([Number(1.0), Minus], &arena);
         assert_eq!(result.unwrap_err(), Error::UnexpectedEndOfStream)
     }
 }
