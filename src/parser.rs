@@ -103,7 +103,7 @@ impl<'a, T: Iterator<Item = Token<'a>>> Parser<'a, T> {
     }
 
     fn parse_factors(&mut self) -> NodeResult<'a> {
-        let mut left = self.parse_exponents()?;
+        let mut left = self.parse_unary()?;
 
         loop {
             let op = match self.current {
@@ -113,14 +113,29 @@ impl<'a, T: Iterator<Item = Token<'a>>> Parser<'a, T> {
             };
 
             self.next_token();
-            let right = self.parse_exponents()?;
+            let right = self.parse_unary()?;
 
             left = self.arena.alloc(op(left, right))
         }
     }
 
+    fn parse_unary(&mut self) -> NodeResult<'a> {
+        return match self.current {
+            Some(Plus) => {
+                self.next_token();
+                self.parse_unary()
+            }
+            Some(Minus) => {
+                self.next_token();
+                let expr = self.parse_unary()?;
+                Ok(self.arena.alloc(Negation(expr)))
+            }
+            _ => self.parse_exponents(),
+        };
+    }
+
     fn parse_exponents(&mut self) -> NodeResult<'a> {
-        let mut left = self.parse_unary()?;
+        let mut left = self.parse_atom()?;
 
         loop {
             if self.current != Some(Caret) {
@@ -134,7 +149,7 @@ impl<'a, T: Iterator<Item = Token<'a>>> Parser<'a, T> {
         }
     }
 
-    fn parse_unary(&mut self) -> NodeResult<'a> {
+    fn parse_atom(&mut self) -> NodeResult<'a> {
         return match self.current {
             Some(Number(value)) => {
                 self.next_token();
@@ -145,15 +160,6 @@ impl<'a, T: Iterator<Item = Token<'a>>> Parser<'a, T> {
                 let expr = self.parse_expression()?;
                 self.consume_token(CloseParen)?;
                 Ok(expr)
-            }
-            Some(Plus) => {
-                self.next_token();
-                self.parse_unary()
-            }
-            Some(Minus) => {
-                self.next_token();
-                let expr = self.parse_unary()?;
-                Ok(self.arena.alloc(Negation(expr)))
             }
             Some(Identifier(name)) => {
                 self.next_token();
@@ -166,6 +172,7 @@ impl<'a, T: Iterator<Item = Token<'a>>> Parser<'a, T> {
                     Ok(self.arena.alloc(Variable(name)))
                 }
             }
+            Some(Plus) | Some(Minus) => self.parse_unary(),
             Some(other) => Err(Error::UnexpectedToken(other)),
             None => Err(Error::UnexpectedEndOfStream),
         };
@@ -280,6 +287,24 @@ mod tests {
                     arena.alloc(Variable("c")),
                 ))
             ))
+        );
+    }
+
+    #[test]
+    fn unary_minus() {
+        let arena = Arena::new();
+
+        let result = parse(
+            [Minus, Identifier("a"), Caret, Minus, Identifier("b")].into_iter(),
+            &arena,
+        );
+
+        assert_eq!(
+            result.unwrap(),
+            arena.alloc(Negation(arena.alloc(Exponentiation(
+                arena.alloc(Variable("a")),
+                arena.alloc(Negation(arena.alloc(Variable("b")))),
+            ))))
         );
     }
 
